@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,6 +14,9 @@ BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 EPOCHS = 5
 SPLIT_DIR = "./outputs/splits/normalization"
+MODEL_DIR = "./outputs/models"
+MODEL_NAME = "mlp"
+DATASET_NAME = "mnist"
 
 
 # Device
@@ -25,6 +29,8 @@ else:
     device = torch.device("cpu")
 
 print("Using device:", device)
+
+os.makedirs(MODEL_DIR, exist_ok=True)
 
 
 # Transform
@@ -151,73 +157,63 @@ def evaluate(model, loader, criterion, device):
 
 
 # Training loop
+best_val_acc = 0.0
+best_model_path = None
+train_losses = []
+val_losses = []
+train_accuracies = []
+val_accuracies = []
 
 for epoch in range(EPOCHS):
     train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
     val_loss, val_acc = evaluate(model, val_loader, criterion, device)
 
+    train_losses.append(train_loss)
+    val_losses.append(val_loss)
+    train_accuracies.append(train_acc)
+    val_accuracies.append(val_acc)
+
     print(f"Epoch [{epoch+1}/{EPOCHS}]")
     print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
     print(f"Val   Loss: {val_loss:.4f} | Val   Acc: {val_acc:.2f}%")
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        best_epoch = epoch + 1
+        previous_best_model_path = best_model_path
+        best_model_path = (
+            f"{MODEL_DIR}/best_{MODEL_NAME}_{DATASET_NAME}_epoch{best_epoch}.pt"
+        )
+        if previous_best_model_path and os.path.exists(previous_best_model_path):
+            os.remove(previous_best_model_path)
+        torch.save(model.state_dict(), best_model_path)
+        print(f"Best model saved to: {best_model_path}")
+
     print("-" * 50)
+print(f"Best model saved at: {best_model_path}")
 
 
-# Final test evaluation
+# Training Curves
+epochs = range(1, EPOCHS + 1)
 
-test_loss, test_acc = evaluate(model, test_loader, criterion, device)
-print(f"Final Test Loss: {test_loss:.4f}")
-print(f"Final Test Accuracy: {test_acc:.2f}%")
-
-
-# -----------------------------
-# Detailed Evaluation
-# -----------------------------
-model.eval()
-
-all_preds = []
-all_labels = []
-all_confidences = []
-correct_confidences = []
-wrong_confidences = []
-
-with torch.no_grad():
-    for images, labels in test_loader:
-        images = images.to(device)
-        labels = labels.to(device)
-
-        outputs = model(images)
-        probs = F.softmax(outputs, dim=1)
-
-        confidences, preds = torch.max(probs, dim=1)
-
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
-        all_confidences.extend(confidences.cpu().numpy())
-
-        correct_mask = preds == labels
-        wrong_mask = preds != labels
-
-        correct_confidences.extend(confidences[correct_mask].cpu().numpy())
-        wrong_confidences.extend(confidences[wrong_mask].cpu().numpy())
-
-# -----------------------------
-# Confusion Matrix
-# -----------------------------
-cm = confusion_matrix(all_labels, all_preds)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(range(10)))
-
-fig, ax = plt.subplots(figsize=(8, 8))
-disp.plot(ax=ax, cmap="Blues", values_format="d")
-plt.title("Confusion Matrix - Baseline MLP on MNIST")
+plt.figure(figsize=(8, 5))
+plt.plot(epochs, train_losses, marker="o", label="Train Loss")
+plt.plot(epochs, val_losses, marker="o", label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training and Validation Loss")
+plt.xticks(list(epochs))
+plt.legend()
+plt.grid(True, linestyle="--", alpha=0.5)
 plt.show()
 
-# -----------------------------
-# Confidence Summary
-# -----------------------------
-avg_conf_all = sum(all_confidences) / len(all_confidences)
-avg_conf_correct = sum(correct_confidences) / len(correct_confidences)
-avg_conf_wrong = sum(wrong_confidences) / len(wrong_confidences)
-
-print(f"Average Confidence (All Predictions): {avg_conf_all:.4f}")
-print(f"Average Confidence (Correct Predictions): {avg_conf_correct:.4f}")
-print(f"Average Confidence (Wrong Predictions): {avg_conf_wrong:.4f}")
+plt.figure(figsize=(8, 5))
+plt.plot(epochs, train_accuracies, marker="o", label="Train Accuracy")
+plt.plot(epochs, val_accuracies, marker="o", label="Validation Accuracy")
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy (%)")
+plt.title("Training and Validation Accuracy")
+plt.xticks(list(epochs))
+plt.legend()
+plt.grid(True, linestyle="--", alpha=0.5)
+plt.show()
