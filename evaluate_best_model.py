@@ -17,7 +17,8 @@ from sklearn.metrics import (
 )
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
+VIS_DIR = "./outputs/visualizations"
+os.makedirs(VIS_DIR, exist_ok=True)
 
 BATCH_SIZE = 64
 MODEL_DIR = "./outputs/models"
@@ -84,6 +85,77 @@ def get_latest_best_model_path():
         )
 
     return max(matching_models, key=os.path.getmtime)
+
+def compute_ece(confidences, predictions, labels, n_bins=10):
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+
+    for i in range(n_bins):
+        bin_lower = bins[i]
+        bin_upper = bins[i + 1]
+
+        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
+        prop_in_bin = np.mean(in_bin)
+
+        if prop_in_bin > 0:
+            accuracy_in_bin = np.mean(predictions[in_bin] == labels[in_bin])
+            avg_confidence_in_bin = np.mean(confidences[in_bin])
+            ece += prop_in_bin * abs(avg_confidence_in_bin - accuracy_in_bin)
+
+    return ece
+
+def plot_reliability_diagram(confidences, predictions, labels, n_bins=10, save_path=None):
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+
+    bin_accuracies = []
+    bin_confidences = []
+
+    for i in range(n_bins):
+        bin_lower = bins[i]
+        bin_upper = bins[i + 1]
+
+        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
+
+        if np.sum(in_bin) > 0:
+            accuracy_in_bin = np.mean(predictions[in_bin] == labels[in_bin])
+            avg_confidence_in_bin = np.mean(confidences[in_bin])
+        else:
+            accuracy_in_bin = 0.0
+            avg_confidence_in_bin = 0.0
+
+        bin_accuracies.append(accuracy_in_bin)
+        bin_confidences.append(avg_confidence_in_bin)
+
+    plt.figure(figsize=(6, 6))
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfect Calibration")
+    plt.bar(
+        bin_centers,
+        bin_accuracies,
+        width=0.08,
+        alpha=0.7,
+        edgecolor="black",
+        label="Accuracy"
+    )
+    plt.plot(
+        bin_centers,
+        bin_confidences,
+        marker="o",
+        linewidth=2,
+        label="Confidence"
+    )
+
+    plt.xlabel("Confidence")
+    plt.ylabel("Accuracy")
+    plt.title("Reliability Diagram")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    plt.show()
 
 
 transform = transforms.Compose([
@@ -196,8 +268,10 @@ cm = confusion_matrix(all_labels, all_preds)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(range(10)))
 
 fig, ax = plt.subplots(figsize=(8, 8))
-disp.plot(ax=ax, cmap="Blues", values_format="d")
+disp.plot(ax=ax, cmap="Blues", values_format="d", colorbar=False)
 plt.title("Confusion Matrix - Best MLP on MNIST")
+plt.tight_layout()
+plt.savefig(f"{VIS_DIR}/CM_best_mlp_mnist.png", dpi=300, bbox_inches="tight")
 plt.show()
 
 avg_conf_all = all_confidences.mean()
@@ -209,6 +283,17 @@ print(f"Average Confidence (All Predictions)    : {avg_conf_all:.4f}")
 print(f"Average Confidence (Correct Predictions): {avg_conf_correct:.4f}")
 print(f"Average Confidence (Wrong Predictions)  : {avg_conf_wrong:.4f}")
 
+ece = compute_ece(all_confidences, all_preds, all_labels)
+print(f"ECE: {ece:.4f}")
+
+plot_reliability_diagram(
+    all_confidences,
+    all_preds,
+    all_labels,
+    n_bins=10,
+    save_path=f"{VIS_DIR}/Reliability_Diagram_best_mlp_mnist.png"
+)
+
 plt.figure(figsize=(8, 5))
 plt.hist(correct_confidences, bins=30, alpha=0.7, label="Correct Predictions")
 plt.hist(wrong_confidences, bins=30, alpha=0.7, label="Wrong Predictions")
@@ -216,4 +301,6 @@ plt.xlabel("Confidence")
 plt.ylabel("Frequency")
 plt.title("Confidence Distribution on Clean Test Set")
 plt.legend()
+plt.tight_layout()
+plt.savefig(f"{VIS_DIR}/Conf_Dist_best_mlp_mnist.png", dpi=300, bbox_inches="tight")
 plt.show()
