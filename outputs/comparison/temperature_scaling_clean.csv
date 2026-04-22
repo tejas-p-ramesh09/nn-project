@@ -1,0 +1,3 @@
+Model,Temperature,Accuracy_Before,Accuracy_After,ECE_Before,ECE_After
+MLP,1.0498,0.9789,0.9789,0.0025,0.0021
+CNN,1.1356,0.991,0.991,0.0026,0.0018
