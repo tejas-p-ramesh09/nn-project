@@ -10,9 +10,8 @@ from torch.optim import LBFGS
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
-# -----------------------------
+
 # Config
-# -----------------------------
 BATCH_SIZE = 64
 MODEL_DIR = "./outputs/models"
 MODEL_PATTERN = os.path.join(MODEL_DIR, "best_mlp_mnist_epoch*.pt")
@@ -20,9 +19,8 @@ SPLIT_DIR = "./outputs/splits/normalization"
 VIS_DIR = "./outputs/visualizations"
 os.makedirs(VIS_DIR, exist_ok=True)
 
-# -----------------------------
+
 # Device
-# -----------------------------
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 elif torch.cuda.is_available():
@@ -32,9 +30,8 @@ else:
 
 print("Using device:", device)
 
-# -----------------------------
+
 # Model
-# -----------------------------
 class MLP(nn.Module):
     def __init__(self):
         super().__init__()
@@ -52,9 +49,8 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-# -----------------------------
+
 # Helpers
-# -----------------------------
 def get_latest_best_model_path():
     matching_models = glob.glob(MODEL_PATTERN)
     if not matching_models:
@@ -163,9 +159,8 @@ def evaluate_from_logits(logits, labels):
 
     return accuracy, ece, preds_np, labels_np, confidences_np
 
-# -----------------------------
+
 # Temperature Scaling Wrapper
-# -----------------------------
 class ModelWithTemperature(nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -200,9 +195,8 @@ class ModelWithTemperature(nn.Module):
         print(f"Optimal temperature: {self.temperature.item():.4f}")
         return self
 
-# -----------------------------
+
 # Data
-# -----------------------------
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.1307,), (0.3081,))
@@ -228,23 +222,20 @@ val_dataset = Subset(full_train_dataset, val_indices)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-# -----------------------------
+
 # Load best model
-# -----------------------------
 base_model = MLP().to(device)
 best_model_path = get_latest_best_model_path()
 base_model.load_state_dict(torch.load(best_model_path, map_location=device))
 print(f"Loaded best model from: {best_model_path}")
 
-# -----------------------------
+
 # Fit temperature on validation set
-# -----------------------------
 scaled_model = ModelWithTemperature(base_model)
 scaled_model.set_temperature(val_loader, device)
 
-# -----------------------------
+
 # Evaluate before and after on clean test set
-# -----------------------------
 test_logits, test_labels = collect_logits_and_labels(base_model, test_loader, device)
 scaled_test_logits = scaled_model.temperature_scale(test_logits)
 
@@ -259,9 +250,8 @@ print(f"ECE Before Scaling      : {ece_before:.4f}")
 print(f"Accuracy After Scaling  : {acc_after:.4f}")
 print(f"ECE After Scaling       : {ece_after:.4f}")
 
-# -----------------------------
+
 # Reliability diagrams
-# -----------------------------
 plot_reliability_diagram(
     conf_before,
     preds_before,
@@ -280,9 +270,8 @@ plot_reliability_diagram(
     title="Reliability Diagram After Temperature Scaling",
 )
 
-# -----------------------------
+
 # Confidence histograms
-# -----------------------------
 plt.figure(figsize=(8, 5))
 plt.hist(conf_before, bins=30, alpha=0.7, label="Before Scaling")
 plt.hist(conf_after, bins=30, alpha=0.7, label="After Scaling")

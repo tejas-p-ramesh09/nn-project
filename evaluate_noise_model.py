@@ -18,9 +18,8 @@ from sklearn.metrics import (
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-# -----------------------------
+
 # Config
-# -----------------------------
 VIS_DIR = "./outputs/visualizations"
 os.makedirs(VIS_DIR, exist_ok=True)
 
@@ -29,9 +28,8 @@ MODEL_DIR = "./outputs/models"
 MODEL_PATTERN = os.path.join(MODEL_DIR, "best_mlp_mnist_epoch*.pt")
 NOISE_SIGMA = 0.2  # try 0.1, 0.2, 0.3 later
 
-# -----------------------------
+
 # Device
-# -----------------------------
 if torch.backends.mps.is_available():
     device = torch.device("mps")
 elif torch.cuda.is_available():
@@ -41,9 +39,8 @@ else:
 
 print("Using device:", device)
 
-# -----------------------------
+
 # Model
-# -----------------------------
 class MLP(nn.Module):
     def __init__(self):
         super().__init__()
@@ -61,9 +58,8 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-# -----------------------------
+
 # Helpers
-# -----------------------------
 def get_latest_best_model_path():
     matching_models = glob.glob(MODEL_PATTERN)
     if not matching_models:
@@ -150,9 +146,8 @@ def add_gaussian_noise(images, sigma=0.2):
     MAX_NORM = (1.0 - 0.1307) / 0.3081
     return torch.clamp(noisy_images, MIN_NORM, MAX_NORM)
 
-# -----------------------------
+
 # Data
-# -----------------------------
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.1307,), (0.3081,))
@@ -167,9 +162,8 @@ test_dataset = datasets.MNIST(
 
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-# -----------------------------
+
 # Load best model
-# -----------------------------
 model = MLP().to(device)
 best_model_path = get_latest_best_model_path()
 model.load_state_dict(torch.load(best_model_path, map_location=device))
@@ -178,9 +172,8 @@ model.eval()
 print(f"Loaded best model from: {best_model_path}")
 print(f"Evaluating with Gaussian noise, sigma = {NOISE_SIGMA}")
 
-# -----------------------------
+
 # Noisy evaluation
-# -----------------------------
 all_preds = []
 all_labels = []
 all_confidences = []
@@ -218,9 +211,8 @@ all_confidences = np.array(all_confidences)
 correct_confidences = np.array(correct_confidences)
 wrong_confidences = np.array(wrong_confidences)
 
-# -----------------------------
+
 # Metrics
-# -----------------------------
 accuracy = accuracy_score(all_labels, all_preds)
 precision = precision_score(all_labels, all_preds, average="macro")
 recall = recall_score(all_labels, all_preds, average="macro")
@@ -266,9 +258,8 @@ for cls in range(10):
         f"Wrong Conf = {avg_conf_wrong_cls:.4f}"
     )
 
-# -----------------------------
+
 # Confusion Matrix
-# -----------------------------
 cm = confusion_matrix(all_labels, all_preds)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(range(10)))
 
@@ -279,9 +270,8 @@ plt.tight_layout()
 plt.savefig(f"{VIS_DIR}/CM_noisy_mlp_mnist_sigma{NOISE_SIGMA}.png", dpi=300, bbox_inches="tight")
 plt.show()
 
-# -----------------------------
+
 # Confidence Summary
-# -----------------------------
 avg_conf_all = all_confidences.mean()
 avg_conf_correct = correct_confidences.mean() if len(correct_confidences) > 0 else 0.0
 avg_conf_wrong = wrong_confidences.mean() if len(wrong_confidences) > 0 else 0.0
@@ -294,9 +284,8 @@ print(f"Average Confidence (Wrong Predictions)  : {avg_conf_wrong:.4f}")
 ece = compute_ece(all_confidences, all_preds, all_labels)
 print(f"ECE: {ece:.4f}")
 
-# -----------------------------
+
 # Reliability Diagram
-# -----------------------------
 plot_reliability_diagram(
     all_confidences,
     all_preds,
@@ -306,9 +295,8 @@ plot_reliability_diagram(
     title=f"Reliability Diagram (Noisy, sigma={NOISE_SIGMA})",
 )
 
-# -----------------------------
+
 # Confidence Histogram
-# -----------------------------
 plt.figure(figsize=(8, 5))
 plt.hist(correct_confidences, bins=30, alpha=0.7, label="Correct Predictions")
 plt.hist(wrong_confidences, bins=30, alpha=0.7, label="Wrong Predictions")
