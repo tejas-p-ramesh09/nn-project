@@ -146,7 +146,9 @@ def plot_reliability_diagram(confidences, predictions, labels, n_bins=10, save_p
 def add_gaussian_noise(images, sigma=0.2):
     noise = torch.randn_like(images) * sigma
     noisy_images = images + noise
-    return torch.clamp(noisy_images, -1.0, 1.0)
+    MIN_NORM = (0.0 - 0.1307) / 0.3081
+    MAX_NORM = (1.0 - 0.1307) / 0.3081
+    return torch.clamp(noisy_images, MIN_NORM, MAX_NORM)
 
 # -----------------------------
 # Data

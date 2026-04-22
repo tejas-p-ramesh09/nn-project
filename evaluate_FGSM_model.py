@@ -145,7 +145,9 @@ def plot_reliability_diagram(confidences, predictions, labels, n_bins=10, save_p
 
 def fgsm_attack(images, epsilon, data_grad):
     perturbed_images = images + epsilon * data_grad.sign()
-    return torch.clamp(perturbed_images, -1.0, 1.0)
+    MIN_NORM = (0.0 - 0.1307) / 0.3081
+    MAX_NORM = (1.0 - 0.1307) / 0.3081
+    return torch.clamp(perturbed_images, MIN_NORM, MAX_NORM)
 
 # -----------------------------
 # Data
