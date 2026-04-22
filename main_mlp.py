@@ -15,6 +15,7 @@ LEARNING_RATE = 0.001
 EPOCHS = 5
 SPLIT_DIR = "./outputs/splits/normalization"
 MODEL_DIR = "./outputs/models"
+VIS_DIR = "./outputs/visualizations"
 MODEL_NAME = "mlp"
 DATASET_NAME = "mnist"
 
@@ -31,6 +32,7 @@ else:
 print("Using device:", device)
 
 os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(VIS_DIR, exist_ok=True)
 
 
 # Transform
@@ -205,6 +207,8 @@ plt.title("Training and Validation Loss")
 plt.xticks(list(epochs))
 plt.legend()
 plt.grid(True, linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.savefig(f"{VIS_DIR}/MLP_Train_Val_Loss.png", dpi=300, bbox_inches="tight")
 plt.show()
 
 plt.figure(figsize=(8, 5))
@@ -216,4 +220,6 @@ plt.title("Training and Validation Accuracy")
 plt.xticks(list(epochs))
 plt.legend()
 plt.grid(True, linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.savefig(f"{VIS_DIR}/MLP_Train_Val_Acc.png", dpi=300, bbox_inches="tight")
 plt.show()
